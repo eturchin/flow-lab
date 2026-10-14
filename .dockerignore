@@ -1,0 +1,12 @@
+**/bin
+**/obj
+**/node_modules
+**/appsettings.Local.json
+src/FlowLab.Web/wwwroot
+frontend/test-results
+frontend/playwright-report
+.git
+.env
+artifacts
+tests
+ТЗ.txt

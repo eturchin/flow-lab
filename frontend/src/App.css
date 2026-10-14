@@ -1,0 +1,33 @@
+@import './styles/shell.css';
+@import './styles/topology.css';
+@import './styles/results.css';
+@import './styles/editor.css';
+@import './styles/history.css';
+@import './styles/feedback.css';
+@import './styles/responsive.css';
+
+.guide-panel {
+  margin-top: 24px;
+  padding: clamp(20px, 4vw, 48px);
+  background: var(--surface, #fff);
+  border: 1px solid #e3e7ee;
+  border-radius: 12px;
+  line-height: 1.75;
+  max-width: 1100px;
+}
+.guide-panel h2 {
+  margin-top: 0;
+}
+.guide-panel h3 {
+  margin-top: 30px;
+}
+.guide-panel dt {
+  font-weight: 700;
+  margin-top: 18px;
+}
+.guide-panel dd {
+  margin: 6px 0 0;
+}
+.guide-panel li {
+  margin: 10px 0;
+}

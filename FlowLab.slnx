@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FlowLab.Application/FlowLab.Application.csproj" />
+    <Project Path="src/FlowLab.Domain/FlowLab.Domain.csproj" />
+    <Project Path="src/FlowLab.Infrastructure/FlowLab.Infrastructure.csproj" />
+    <Project Path="src/FlowLab.Simulation/FlowLab.Simulation.csproj" />
+    <Project Path="src/FlowLab.Web/FlowLab.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FlowLab.Tests/FlowLab.Tests.csproj" />
+    <Project Path="tests/FlowLab.Web.Tests/FlowLab.Web.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,52 @@
+name: Validate FlowLab
+on: [push, pull_request]
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: flowlab
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d flowlab"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__FlowLab: Host=localhost;Database=flowlab;Username=postgres;Password=postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci && npm run build && npm run lint && npm run format:check && npm audit --audit-level=high
+        working-directory: frontend
+      - run: dotnet build FlowLab.slnx -c Release
+      - run: dotnet test FlowLab.slnx -c Release --no-build
+      - run: dotnet format FlowLab.slnx --verify-no-changes --no-restore
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Start application
+        run: |
+          dotnet run --project src/FlowLab.Web -c Release --no-build --no-launch-profile --urls http://localhost:5080 > /tmp/flowlab.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://localhost:5080/health/ready; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/flowlab.log
+          exit 1
+      - run: npm run test:e2e
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-diagnostics
+          path: frontend/test-results/
