@@ -1,49 +1,90 @@
-# FlowLab
+﻿# FlowLab
 
-**Визуальная лаборатория производительности и отказоустойчивости backend-систем.**
+**A visual laboratory for backend performance and resilience.**
 
-React 19 + TypeScript · ASP.NET Core / .NET 10 · PostgreSQL 16 · EF Core 10 · SignalR.
+[![Validate FlowLab](https://github.com/eturchin/flow-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/eturchin/flow-lab/actions/workflows/ci.yml)
 
-Задайте нагрузку, соберите последовательные и параллельные этапы, запустите воспроизводимую дискретно-событийную симуляцию и сравните результаты. FlowLab показывает влияние ограниченной параллельности, FIFO/LIFO очередей, отказов зависимости, повторов и circuit breaker. Вкладка «Инструкция и примеры» содержит описание настроек, метрик и экспериментов.
+Build a system topology, configure traffic, run a reproducible discrete-event simulation, and compare results. Explore how concurrency limits, queues, dependency failures, retries, and circuit breakers affect latency, throughput, and resource utilization.
 
-Рабочие пространства создаются, переименовываются и удаляются в боковой панели. Каждое содержит свои сценарии. Корзина возле сценария удаляет его вместе с историей запусков; удаление пространства удаляет все его сценарии и запуски. Оба действия требуют подтверждения в popup. Активные запуски блокируют удаление. Пространства хранятся в PostgreSQL; миграция `AddWorkspaces` относит существующие сценарии к пространству «Лаборатория». Демонстрационные сценарии создаются только при первой инициализации базы и не восстанавливаются после удаления.
+**Stack:** React 19 · TypeScript · ASP.NET Core / .NET 10 · PostgreSQL 16 · EF Core 10 · SignalR.
 
-### Графы API и очереди сообщений
+FlowLab is an educational simulator. It does not send load to real services or predict production performance precisely. The application UI is currently in Russian; this README uses English descriptions of its controls.
 
-Нажмите **«Редактировать связи»** над топологией, чтобы преобразовать существующие этапы в граф. Добавляйте и удаляйте явные связи через поля «Откуда» и «Куда». Порядок узлов в массиве больше не задаёт маршрут. Ветви выполняются независимо, общий потомок запускается один раз после завершения всех активных предшественников. Источник и сервисы поддерживают рассылку во все исходящие ветви либо выбор одной ветви по кругу. Схема должна быть достижима от источника и не содержать циклов; максимум 512 связей.
+![FlowLab topology editor, performance metrics, and simulation charts](docs/images/flowlab.png)
 
-Готовые примеры **«Два API параллельно»** и **«RabbitMQ + 3 консьюмера»** заменяют схему в редакторе. Брокер содержит общую ограниченную FIFO/LIFO очередь и выдаёт каждое сообщение одному свободному консьюмеру по кругу. Обработчики консьюмера ограничивают число одновременных доставок; занятые консьюмеры пропускаются. Консьюмер брокера не может иметь другие входящие связи. Для рассылки каждому подписчику используйте несколько брокеров, представляющих отдельные очереди. В диагностике показаны число начатых вызовов / доставок, очередь брокера и загрузка консьюмеров.
+## Features
 
-Модель измеряет обработку задания до конца, включая ожидание в брокере. Это не отдельная задержка HTTP-ответа издателя. Таймауты и повторы относятся ко всему маршруту; durable storage, publisher confirms, nack/requeue, DLQ и восстановление брокера пока не моделируются. Старые сценарии без `connections` продолжают выполняться в режиме этапов; JSON-хранилище поддерживает новый граф без миграции БД.
+- **Workspaces and scenarios:** organize experiments, edit configurations, and retain run history in PostgreSQL.
+- **Topology editor:** model sequential and parallel stages or an explicit directed acyclic graph with broadcast and round-robin routing.
+- **Queues and brokers:** explore bounded FIFO/LIFO buffers and shared message queues with competing consumers.
+- **Traffic and processing:** configure arrival rates, duration, distributions, worker counts, processing times, variability, error probabilities, and random seeds.
+- **Resilience:** simulate dependency degradation, route timeouts, bounded retries with exponential backoff, and per-service circuit breakers.
+- **Live experiments:** start or cancel runs and receive progress through SignalR, with HTTP state recovery.
+- **Metrics:** inspect throughput, p50/p95/p99 latency, errors, queue sizes, utilization, and node diagnostics.
+- **Failure analysis:** browse a paginated request failure journal with arrival/completion times, attempt counts, and failure reasons.
+- **Run comparison:** compare two completed runs of the same scenario. Each run stores an immutable configuration snapshot.
 
-> Интерфейс реализован на **React** по прямому указанию заказчика, вместо Blazor из исходного ТЗ. Это учебная модель, а не точный прогноз production-системы.
+Workspace and scenario deletion requires confirmation and is blocked while runs are active. Deleting a scenario also deletes its runs; deleting a workspace removes its scenarios and runs. Demo scenarios are seeded during initial database setup and are not recreated after deletion.
 
-![FlowLab: топология, метрики и графики реального запуска](docs/images/flowlab.png)
+## Quick start with Docker
 
-## Быстрый локальный запуск
+With Docker and Docker Compose installed, run from the repository root:
 
-Нужны .NET SDK 10, Node.js 22.12+ и PostgreSQL на `localhost:5432`. В этой среде проверено подключение `postgres` / `postgres`; эти публичные локальные учётные данные нельзя использовать в production.
+```bash
+docker compose up --build -d
+```
 
-Из корня в PowerShell:
+Open **http://localhost:8080**.
+
+Compose starts the application and PostgreSQL. The application port is bound to localhost, and the database port is not published. Database data persists in the `flowlab-data` volume. The application waits for the database health check, applies EF Core migrations, and runs as a non-root user.
+
+```bash
+docker compose ps
+docker compose logs app
+docker compose down
+```
+
+`docker compose down` preserves database data. To set a different local database password, copy `.env.example` to `.env` and edit `POSTGRES_PASSWORD` **before the first launch**. Changing this variable does not update the password inside an existing database volume.
+
+The Compose configuration uses `Development` and is intended for local use. The default `postgres` password is a demo credential, not a production secret.
+
+## Local development
+
+### Prerequisites
+
+- .NET SDK 10
+- Node.js 22.12 or newer
+- PostgreSQL 16, available at `localhost:5432` for the default configuration
+- PowerShell for the startup script and the examples below
+
+### Startup script
+
+From the repository root:
 
 ```powershell
 ./start.ps1
 ```
 
-Скрипт устанавливает frontend-зависимости при необходимости, собирает React, запускает приложение в Development и задаёт локальную строку подключения, если переменная ещё не установлена. Откройте **http://localhost:5080**. Повторный запуск без пересборки интерфейса: `./start.ps1 -SkipFrontend`.
+The script installs frontend dependencies if `node_modules` is missing, builds the React application, and starts ASP.NET Core in Development at **http://localhost:5080**. Unless `ConnectionStrings__FlowLab` is already set, it uses database `flowlab` with username/password `postgres` / `postgres`.
 
-Приложение автоматически применяет EF migrations. Если базы `flowlab` ещё нет, пользователь PostgreSQL должен иметь право создавать базы; иначе создайте её заранее:
+To reuse an existing frontend build:
 
 ```powershell
-# psql должен находиться в PATH; на Windows он обычно в C:/Program Files/PostgreSQL/16/bin.
+./start.ps1 -SkipFrontend
+```
+
+EF Core migrations run automatically at startup. If the `flowlab` database does not exist, the PostgreSQL user needs permission to create it. Alternatively, create it beforehand:
+
+```powershell
+# psql must be on PATH; on Windows it is commonly in C:/Program Files/PostgreSQL/16/bin.
 $env:PGPASSWORD = 'postgres'
 psql -h localhost -U postgres -d postgres -c 'CREATE DATABASE flowlab;'
 Remove-Item Env:PGPASSWORD
 ```
 
-Существующую базу создавать повторно не нужно. Пароли и настройки уже работающего PostgreSQL приложение не меняет.
+Skip database creation if it already exists. FlowLab does not change the credentials or configuration of an existing PostgreSQL installation.
 
-### Ручной запуск и миграции
+### Manual startup
 
 ```powershell
 cd frontend
@@ -53,12 +94,17 @@ cd ..
 
 $env:ASPNETCORE_ENVIRONMENT = 'Development'
 $env:ConnectionStrings__FlowLab = 'Host=localhost;Port=5432;Database=flowlab;Username=postgres;Password=postgres'
-dotnet tool restore
-dotnet ef database update --project src/FlowLab.Infrastructure --startup-project src/FlowLab.Web
 dotnet run --project src/FlowLab.Web
 ```
 
-Можно вместо переменной создать `src/FlowLab.Web/appsettings.Local.json`:
+To apply migrations explicitly before starting the application:
+
+```powershell
+dotnet tool restore
+dotnet ef database update --project src/FlowLab.Infrastructure --startup-project src/FlowLab.Web
+```
+
+For manual or IDE startup, you can also create `src/FlowLab.Web/appsettings.Local.json`:
 
 ```json
 {
@@ -68,143 +114,136 @@ dotnet run --project src/FlowLab.Web
 }
 ```
 
-Этот файл игнорируется Git и Docker, читается только в Development и не включается в `dotnet publish`. Переменные окружения имеют приоритет. Конфигурация с реальными секретами в репозитории отсутствует. В этой рабочей папке локальный файл уже создан для проверенного подключения.
+This file is ignored by Git and Docker, loaded only in Development, and excluded from `dotnet publish`. Environment variables take precedence. The startup script sets the connection-string environment variable, so set that variable yourself when using the script with a custom database.
 
-### Запуск из Rider
+### Rider
 
-Выберите `FlowLab.Web` и launch profile **http** из `Properties/launchSettings.json`, затем Run/Debug. Профиль задаёт Development и адрес `http://localhost:5080`; локальная строка подключения читается из `appsettings.Local.json` или окружения. После свежего клонирования один раз выполните `npm ci` и `npm run build` в `frontend`.
+Select `FlowLab.Web` and the **http** launch profile from `Properties/launchSettings.json`, then Run/Debug. The profile uses Development and `http://localhost:5080`. After a fresh clone, run `npm ci` and `npm run build` in `frontend` once.
 
-Перед запуском в Rider остановите экземпляр, запущенный через `start.ps1` или `dotnet run`: они используют тот же порт. Docker использует отдельный порт 8080 и не мешает Rider. Приложение не должно одновременно запускаться из IDE и терминала с одним адресом.
+Stop any application instance using port 5080 before launching another from the IDE or terminal. The Docker application uses port 8080.
 
-### React HMR
+### Frontend hot reload
 
-Для разработки React с HMR в отдельном терминале:
+Keep the backend running on port 5080, then open a second terminal:
 
 ```powershell
 cd frontend
 npm run dev
 ```
 
-Откройте **http://localhost:5173**. Vite проксирует API и WebSocket SignalR на backend `:5080`. В собранном варианте frontend, API и SignalR обслуживает одно ASP.NET Core приложение.
+Open **http://localhost:5173**. Vite proxies API requests and SignalR WebSockets to the backend. In the built application, ASP.NET Core serves the frontend, API, and SignalR together.
 
-## Docker
+## Modeling systems
 
-```bash
-docker compose up --build -d
-```
+### Stages, graphs, and message queues
 
-Откройте **http://localhost:8080**. Compose запускает ровно два контейнера: приложение и PostgreSQL. БД изолирована от локального PostgreSQL; её порт наружу не публикуется. Данные находятся в именованном volume `flowlab-data`. Приложение ожидает PostgreSQL health check, применяет миграции и работает от непривилегированного пользователя.
+Add services, queues, and external APIs in the editor. In stage mode, adjacent services can run in parallel; the next stage waits for all branches. A Queue node configures the buffer of the **following service**.
 
-```bash
-docker compose ps
-docker compose logs app
-docker compose down
-```
+Use the connection editor above the topology to convert stages into an explicit graph. Connections determine routing rather than node order. Branches run independently, and a shared downstream node starts once all active predecessors finish. Sources and services support broadcasting to all outgoing branches or selecting one branch in round-robin order. Graphs must be reachable from the source and contain no cycles, with a maximum of 512 connections.
 
-`down` сохраняет данные. Для смены локального пароля скопируйте `.env.example` в `.env` **до первого запуска** и задайте своё значение. Смена переменной не меняет пароль уже созданного PostgreSQL volume.
+The parallel API and RabbitMQ presets replace the current topology. A Broker node models a shared bounded FIFO/LIFO queue and delivers each message to one available consumer in round-robin order. Consumer worker counts limit concurrent deliveries; busy consumers are skipped. Broker consumers cannot have other incoming connections. To model delivery to every subscriber, use separate brokers representing separate queues.
 
-Compose предназначен для **локальной разработки** и явно использует `Development`. Значение `postgres` по умолчанию — только удобство демонстрации. Для production нужны отдельная конфигурация, секреты, TLS, контроль доступа и ограничение сетевого доступа. Приложение отклоняет пустой пароль и `postgres` вне Development.
+Broker metrics cover end-to-end job completion, including queue waiting time, rather than the publisher's HTTP response latency. Timeouts and retries apply to the whole route. Durable storage, publisher confirms, nack/requeue, dead-letter queues, and broker recovery are not modeled. Existing scenarios without `connections` continue to use stage mode; graph settings use the existing JSON storage without an additional database migration.
 
-## Что можно делать
+### Suggested experiments
 
-- Создавать, редактировать и удалять сценарии; демонстрационные сценарии добавляются только в пустую базу.
-- Добавлять, удалять и переставлять сервисы, FIFO/LIFO очереди и внешние API. Источник и приёмник создаются автоматически. Соседние сервисы объединяются в параллельный этап переключателем «Параллельно с предыдущим сервисом»; следующий этап ждёт все ветви.
-- Менять интенсивность, длительность, seed, распределения, обработчики, задержку, вариативность и ошибки.
-- Задавать окно деградации внешнего API, таймаут, ограниченные повторы с exponential backoff и circuit breaker.
-- Запускать и останавливать эксперименты, следить за прогрессом через SignalR с HTTP-восстановлением состояния.
-- Смотреть throughput, p50/p95/p99, ошибки, среднюю и максимальную очередь, загрузку и диагностику узлов.
-- Разбирать ошибки отдельных запросов в постраничном журнале: id запроса, время поступления/завершения, число попыток и причина.
-- Сравнивать два завершённых запуска одного сценария: первый выбранный — базовый, второй — кандидат. При нулевой базе ненулевое относительное изменение показывается как неопределённое.
-- Открывать исторические результаты после изменения сценария: настройки запуска сохраняются отдельным снимком.
+1. **Payment gateway:** run the baseline, increase traffic from 80 to 150 requests/second, and compare p95 latency, queue lengths, and utilization.
+2. **Rush hour:** increase the bottleneck Order Service from two workers to eight and rerun with the same seed.
+3. **Dependency outage:** simulate an external API outage from second 20 to second 30. Compare the baseline with a circuit breaker, then separately try three attempts and inspect retries, errors, and dependency load.
 
-## Архитектура
+When comparing runs, the first selected run is the baseline and the second is the candidate. A nonzero relative change from a zero baseline is shown as undefined. The in-app guide explains settings, metrics, and experiments in more detail.
 
-```text
-frontend/src/components + hooks      React UI, редактор, графики, история
-             │ HTTP / SignalR
-FlowLab.Web                         endpoints, composition root, worker, hub, health, errors
-             │
-FlowLab.Application                 use cases, DTO, interfaces, сравнение
-             │                         ▲
-FlowLab.Domain                      настройки, правила, результаты
-             ▲                         │
-FlowLab.Simulation                  чистый дискретно-событийный движок
+## Architecture
 
-FlowLab.Infrastructure → Application + Domain
-  persistence/entities/configuration/migrations, PostgreSQL, JSON serialization
-```
+| Project                  | Responsibility                                                                                             |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `frontend`               | React UI, topology editor, charts, run history, and HTTP/SignalR clients                                   |
+| `FlowLab.Web`            | HTTP endpoints, dependency composition, background workers, SignalR hub, health checks, and error handling |
+| `FlowLab.Application`    | Use cases, DTOs, interfaces, and run comparison                                                            |
+| `FlowLab.Domain`         | Scenario settings, validation rules, and simulation results                                                |
+| `FlowLab.Simulation`     | Discrete-event simulation engine                                                                           |
+| `FlowLab.Infrastructure` | EF Core persistence, entities, migrations, PostgreSQL, and JSON serialization                              |
 
-В `Program.cs` только композиция и HTTP pipeline. Application не зависит от HTTP, EF Core или SignalR. Simulation не зависит от ASP.NET Core, БД или часов реального времени. EF-сущности не выходят за границу Infrastructure. В API возвращаются DTO; состояние календаря, запросов и станций никогда не сериализуется наружу.
+Application has no dependency on HTTP, EF Core, or SignalR. Simulation does not depend on ASP.NET Core, the database, or wall-clock time. EF entities stay inside Infrastructure; API responses use DTOs rather than internal event-calendar or request state.
 
-**Поток запуска:** HTTP → резервирование места → сохранение `Queued` и снимка → bounded Channel → один из двух workers → `Running` → Simulation → throttled SignalR → сохранение результата → `Completed`. Исключение даёт `Failed`, отмена — `Cancelled`. При перезапуске оставшиеся `Queued` / `Running` становятся `Failed` с понятной причиной. Прогресс отправляется не чаще одного раза за 150 мс, а не на каждое событие.
+A run reserves capacity, persists its configuration snapshot with status `Queued`, and enters a bounded channel. One of two workers marks it `Running`, executes the simulation, sends throttled progress updates, and saves the result as `Completed`. Errors produce `Failed`; cancellation produces `Cancelled`. Progress is sent at most once every 150 ms. On application restart, interrupted `Queued` and `Running` jobs become `Failed` rather than resuming.
 
-Подробнее: [архитектурные решения](docs/ARCHITECTURE.md), [API](docs/API.md).
+Further documentation, currently in Russian:
 
-Результаты выполненных проверок: [VERIFICATION.md](docs/VERIFICATION.md).
+- [Architecture decisions](docs/ARCHITECTURE.md)
+- [API reference](docs/API.md)
+- [Verification notes](docs/VERIFICATION.md)
 
-## Математическая модель и единицы
+## Simulation semantics
 
-- Внутреннее время, таймауты и задержки — **миллисекунды**. Интенсивность и throughput — **запросы/сек**, вероятности — `[0, 1]`, отображаемая загрузка и ошибки — проценты.
-- Модель поддерживает до 32 редактируемых узлов: старые последовательные/параллельные этапы либо явный граф связей. Узел «Очередь» задаёт буфер **следующего** сервиса; узел «Брокер» распределяет сообщения из общей очереди между несколькими сервисами-консьюмерами.
-- Источник использует постоянный интервал или экспоненциальный межприходный интервал (пуассоновский поток). Первый запрос приходит после первого интервала. Правая граница периода генерации исключена.
-- Обработка фиксированная или экспоненциальная; дополнительная вариативность — равномерный множитель `[1-v, 1+v]`. Все случайные значения создаёт seeded `Random` конкретного запуска.
-- События сортируются по `(virtual time, insertion sequence)`. При точном совпадении таймаута и завершения обработки выигрывает таймаут, поскольку он планируется первым.
-- Таймаут действует на **всю попытку маршрута**. Повтор начинает маршрут заново; число попыток включает первую. Задержка: `min(maxDelay, initialDelay × 2^(attempt-1))`. Переполнение очереди завершает запрос без повтора.
-- При ошибке или таймауте попытки удаляются все её ожидающие ветви. Удаление каждой записи из очереди использует дескриптор LinkedList. Уже начатая обработка занимает ресурс до завершения; её устаревший результат не завершает запрос повторно. Повтор запускает весь маршрут и может пересекаться с ещё выполняющимися вызовами старой попытки.
-- Circuit breaker отдельный для каждого сервисного узла: порог **последовательных ошибок обработки**, период Open, одна проба HalfOpen. Успех сбрасывает счётчик и закрывает breaker. Клиентские таймауты и переполнение очереди не влияют на breaker. Завершения старого поколения не влияют на новую пробу.
-- Окно внешнего отказа определяется в момент начала обработки, интервал `[start, start+duration)`. В окне время умножается на заданный коэффициент; при полном отказе обработка завершается ошибкой.
-- После остановки источника запросы и уже начатая обработка дорабатываются. Throughput и интегральные средние используют **всё время с доработкой**. Графики содержат 100 срезов периода генерации; latency на графике — средняя задержка запросов, завершившихся в интервале. Загрузка на графике — среднее текущих долей занятых обработчиков по сервисам.
-- p50/p95/p99 считаются линейной интерполяцией по всем завершённым запросам, включая ошибки. Для пустой выборки — 0. Средняя очередь интегрируется по времени; итоговое среднее — сумма по станциям, максимум — наибольшая очередь отдельного узла.
-- Время ожидания CPU, сеть, GC, блокировки БД и побочные эффекты реальных операций не моделируются. Одинаковый seed гарантирует воспроизводимость **одинаковой конфигурации** в одной версии движка; при изменении конфигурации расход случайной последовательности может измениться.
+- **Units:** internal time, timeouts, and delays use milliseconds. Arrival rate and throughput use requests/second. Probabilities range from 0 to 1; displayed utilization and error rates are percentages.
+- **Topology:** up to 32 editable nodes, using sequential/parallel stages or an explicit graph. Brokers distribute messages from a shared queue to consumer services.
+- **Arrivals:** fixed intervals or exponentially distributed interarrival times (a Poisson process). The first request arrives after the first interval; the generation window excludes its right boundary.
+- **Processing:** fixed or exponential service times, with optional uniform variation using a multiplier in `[1-v, 1+v]`. Each run uses its own seeded random generator.
+- **Event ordering:** events are ordered by `(virtual time, insertion sequence)`. If a timeout and completion occur at exactly the same time, the timeout wins because it was scheduled first.
+- **Timeouts and retries:** a timeout covers the entire route attempt. A retry restarts the route; the attempt count includes the initial attempt. Backoff is `min(maxDelay, initialDelay × 2^(attempt-1))`. Queue overflow fails a request without retrying.
+- **Failed attempts:** pending branches are removed from queues using linked-list handles. Processing already in progress retains its resources until completion, but stale results cannot complete a request again. A retry can overlap with work still running from a previous attempt.
+- **Circuit breakers:** each service tracks consecutive processing failures, an Open interval, and one HalfOpen probe. Success resets the counter and closes the breaker. Client timeouts and queue overflow do not affect it; old-generation completions do not affect a new probe.
+- **Dependency degradation:** the window is evaluated when processing starts, over `[start, start+duration)`. Processing time is multiplied by the configured factor; a full outage produces an error.
+- **Drain time:** after the source stops, requests and in-flight processing finish. Throughput and time-weighted averages include this drain period. Charts contain 100 slices of the generation window; chart latency is the mean latency of requests completed in a slice, and chart utilization averages the current busy-worker fractions across services.
+- **Aggregates:** p50/p95/p99 use linear interpolation across completed requests, including failures; an empty sample returns zero. Queue averages are time-weighted. The overall average sums station averages; the maximum is the largest queue at an individual node.
+- **Reproducibility:** the same seed reproduces the same configuration within the same engine version. Configuration changes can alter random-number consumption. CPU scheduling, networking, garbage collection, database locks, and real-operation side effects are outside the model.
 
-**Контроль M/M/1:** тест использует λ = 100/s, μ = 200/s, ρ = 0,5. Теоретические `W = 1/(μ−λ) = 10 мс`, `Lq = ρ²/(1−ρ) = 0,5`, загрузка 50%. Результат симуляции проверяется с допуском на конечную случайную выборку. Формула не заменяет движок.
+The M/M/1 test uses arrival rate λ = 100/s and service rate μ = 200/s, giving utilization ρ = 0.5. It checks simulation results against theoretical mean time `W = 1/(μ−λ) = 10 ms`, mean queue length `Lq = ρ²/(1−ρ) = 0.5`, and 50% utilization, with tolerance for a finite random sample.
 
-## Сборка и проверки
+## Build and test
+
+From the repository root:
 
 ```powershell
-dotnet build FlowLab.slnx -c Release
-dotnet test FlowLab.slnx -c Release
-dotnet format FlowLab.slnx --verify-no-changes --no-restore
-
 cd frontend
 npm ci
 npm run build
 npm run lint
 npm run format:check
+npm audit --audit-level=high
+cd ..
+
+dotnet build FlowLab.slnx -c Release
+dotnet test FlowLab.slnx -c Release --no-build
+dotnet format FlowLab.slnx --verify-no-changes --no-restore
 ```
 
-Чистые .NET-тесты не требуют PostgreSQL. Проверяются seed, календарь событий, параллельность, FIFO, ошибки, timeout/backoff, circuit breaker, перцентили, сравнение и M/M/1.
+The .NET tests do not require PostgreSQL. They cover deterministic seeds, event ordering, concurrency, queues, errors, timeout/backoff behavior, circuit breakers, percentiles, comparison, and the M/M/1 reference case.
 
-API- и браузерные тесты используют запущенное приложение с PostgreSQL, создают временные сценарии:
+### API and browser tests
+
+Start the application with PostgreSQL first, preferably using a separate test database. The Playwright suite creates temporary workspaces and scenarios and exercises the running application:
 
 ```powershell
 cd frontend
 npx playwright install chromium
 npm run test:e2e
+```
 
-# Можно использовать уже установленный Chrome вместо загрузки Chromium:
+The default target is `http://localhost:5080`. Optional overrides:
+
+```powershell
+# Use an installed Chrome browser instead of the downloaded Chromium.
 $env:PLAYWRIGHT_CHANNEL = 'chrome'
 npm run test:e2e
 
-# Проверка контейнерного приложения:
+# Test the Docker application.
 $env:FLOWLAB_URL = 'http://localhost:8080'
 npm run test:e2e
 ```
 
-Проверяются CRUD, HTTP-статусы, неизменность снимков, повторяемость, сравнение, каскадное удаление, SignalR, отмена и полный пользовательский сценарий. Проверяется mobile viewport 390px без переполнения страницы. Скриншоты пишутся в `artifacts/`, диагностические traces — в `frontend/test-results/`.
+Coverage includes CRUD, validation and HTTP status codes, immutable snapshots, deterministic reruns, comparison, cascading deletion, SignalR progress, cancellation, graph editing, brokers, workspace isolation, and complete UI workflows. Layout checks include a 390 px mobile viewport. Screenshots are written to `artifacts/`; failure screenshots and traces are retained in `frontend/test-results/`.
 
-## Сценарии для демонстрации
+[GitHub Actions](.github/workflows/ci.yml) runs frontend build, lint, formatting, and dependency audit; .NET build, tests, and formatting; and Playwright tests against the application with PostgreSQL.
 
-1. **Платёжный шлюз:** запустите базовый сценарий, затем увеличьте поток с 80 до 150 req/s. Выберите оба запуска и сравните p95, очереди и загрузку.
-2. **Час пик:** узкое место — два обработчика `Order Service`. Увеличьте число до восьми и повторите запуск с тем же seed.
-3. **Отказ зависимости:** внешний API не работает с 20-й по 30-ю секунду. Сначала выполните baseline, затем включите breaker. Отдельно попробуйте три попытки и сравните количество повторов, ошибки и нагрузку на зависимость.
+## Operational behavior and limits
 
-## Эксплуатация и границы первой версии
-
-- `GET /health/live` — процесс работает; `GET /health/ready` — PostgreSQL доступен, иначе 503.
-- Недоступная БД или ошибка миграции **останавливают старт**, успешный запуск без постоянного хранилища не имитируется.
-- Структурированные JSON-логи, Problem Details с traceId, валидация на сервере. Пароль подключения не логируется, EF sensitive data logging выключен.
-- Два одновременно работающих вычислителя, максимум десять активных и ожидающих задач; при переполнении — HTTP 429. Не более миллиона ожидаемых запросов на сценарий; фактический защитный предел — 1,5 млн. Длительность до часа, максимум десять попыток.
-- История API возвращает последние 100 запусков; остальные записи остаются в БД. Отдельный запуск доступен по id.
-- MVP рассчитан на **один экземпляр приложения**, без авторизации и распределённой очереди. Публичное размещение требует отдельного этапа защиты доступа. Восстановление после рестарта завершает прерванные задачи ошибкой, не продолжает вычисление.
-- Исходный `ТЗ.txt` сохранён. Поддерживаются графы без циклов, параллельные вызовы, распределение по кругу и брокеры с общей очередью. Drag-and-drop, произвольные циклы, маршрутизация по содержимому сообщения, отдельный жизненный цикл HTTP-ответа и фонового задания, ожидание первой успешной ветви не реализованы. Реальные HTTP-сервисы приложение не нагружает.
+- `GET /health/live` reports process liveness. `GET /health/ready` checks PostgreSQL and returns 503 when unavailable.
+- A database connection or migration failure prevents application startup.
+- Logs use structured JSON. API errors use Problem Details with a `traceId`; validation runs on the server. Connection passwords are not logged, and EF sensitive-data logging is disabled.
+- Two simulations can execute concurrently, with a maximum of ten running and queued jobs combined. Capacity exhaustion returns HTTP 429.
+- Scenarios allow up to one million expected requests, with a runtime safety limit of 1.5 million, a maximum generation duration of one hour, and at most ten attempts per request.
+- The history API returns the latest 100 runs. Older records remain in the database and can be retrieved individually by ID.
+- The application targets a single instance and has no authentication or distributed job queue. Public deployment requires access control, separate secrets and configuration, TLS, and network restrictions. Outside Development, empty database passwords and the demo password `postgres` are rejected.
+- Drag-and-drop editing, cyclic graphs, content-based routing, separate HTTP-response/background-job lifecycles, and first-success branch completion are not implemented.
