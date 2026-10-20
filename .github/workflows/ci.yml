@@ -27,7 +27,20 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci && npm run build && npm run lint && npm run format:check && npm audit --audit-level=high
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
+      - name: Lint frontend
+        run: npm run lint
+        working-directory: frontend
+      - name: Check frontend formatting
+        run: npm run format:check
+        working-directory: frontend
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high
         working-directory: frontend
       - run: dotnet build FlowLab.slnx -c Release
       - run: dotnet test FlowLab.slnx -c Release --no-build

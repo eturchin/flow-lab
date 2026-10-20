@@ -38,6 +38,8 @@ test('sidebar: only scenario list scrolls, controls stay visible at desktop and 
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
+      // Responsive styles can load new font sizes/weights and shift the layout.
+      await page.evaluate(() => document.fonts.ready)
       await list.evaluate((el) => {
         el.scrollTop = 0
       })

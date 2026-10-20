@@ -50,7 +50,10 @@ public sealed class LabStore(LabDbContext db) : ILabStore
             ? (await db.Scenarios.FromSqlInterpolated($"SELECT * FROM \"Scenarios\" WHERE \"Id\" = {id.Value} FOR UPDATE").ToListAsync(ct)).SingleOrDefault() ?? throw new KeyNotFoundException("Сценарий не найден.")
             : new ScenarioEntity { Id = Guid.NewGuid() };
         if (input.WorkspaceId is null && snapshot is not null && entity.WorkspaceId != workspaceId)
+        {
             throw new InvalidOperationException("Рабочее пространство сценария изменилось. Обновите список и повторите действие.");
+        }
+
         entity.WorkspaceId = workspaceId;
 
         entity.Name = input.Name.Trim();

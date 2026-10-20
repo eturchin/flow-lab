@@ -1,3 +1,5 @@
+using FlowLab.Domain;
+
 namespace FlowLab.Application;
 
 public sealed class RunService(ILabStore store, IRunScheduler scheduler)

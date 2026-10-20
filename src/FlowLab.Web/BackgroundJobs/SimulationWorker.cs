@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
+using System.Data.Common;
 using System.Diagnostics;
 using System.Threading.Channels;
-using System.Data.Common;
 using FlowLab.Application;
 using FlowLab.Domain;
 using FlowLab.Simulation;

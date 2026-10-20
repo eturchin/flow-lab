@@ -72,7 +72,9 @@ export function useRunStream(
         await connection.invoke('Watch', runId)
         markConnected(true)
         void refresh()
-      } catch { markConnected(false) }
+      } catch {
+        markConnected(false)
+      }
     })
     connection.onclose(() => markConnected(false))
     void connection
@@ -90,7 +92,9 @@ export function useRunStream(
     return () => {
       disposed = true
       window.clearInterval(timer)
-      void connection.stop().catch(() => { /* HTTP polling is independent of transport shutdown. */ })
+      void connection.stop().catch(() => {
+        /* HTTP polling is independent of transport shutdown. */
+      })
     }
   }, [runId, onRun, onError])
   return {

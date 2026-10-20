@@ -34,27 +34,30 @@ export function useLab() {
   const selection = useRef<string | null>(null)
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved)
 
-  const select = useCallback(async (scenario: Scenario) => {
-    selection.current = scenario.id
-    setSelecting(true)
-    setDraft(structuredClone(scenario))
-    setSaved(scenario)
-    setCurrentRun(null)
-    setComparison(null)
-    setRuns([])
-    setError('')
-    setNotice('')
-    try {
-      const history = await api<Run[]>(`/scenarios/${scenario.id}/runs`)
-      if (selection.current !== scenario.id) return
-      setRuns(history)
-      setCurrentRun(history[0] ?? null)
-    } catch (e) {
-      if (selection.current === scenario.id) setError((e as Error).message)
-    } finally {
-      if (selection.current === scenario.id) setSelecting(false)
-    }
-  }, [setCurrentRun])
+  const select = useCallback(
+    async (scenario: Scenario) => {
+      selection.current = scenario.id
+      setSelecting(true)
+      setDraft(structuredClone(scenario))
+      setSaved(scenario)
+      setCurrentRun(null)
+      setComparison(null)
+      setRuns([])
+      setError('')
+      setNotice('')
+      try {
+        const history = await api<Run[]>(`/scenarios/${scenario.id}/runs`)
+        if (selection.current !== scenario.id) return
+        setRuns(history)
+        setCurrentRun(history[0] ?? null)
+      } catch (e) {
+        if (selection.current === scenario.id) setError((e as Error).message)
+      } finally {
+        if (selection.current === scenario.id) setSelecting(false)
+      }
+    },
+    [setCurrentRun],
+  )
 
   const clearSelection = useCallback(() => {
     selection.current = null
@@ -107,19 +110,26 @@ export function useLab() {
       .then((data) => {
         if (!disposed) return hydrate(data)
       })
-      .catch((e) => { if (!disposed) setError((e as Error).message) })
-      .finally(() => { if (!disposed) setLoading(false) })
+      .catch((e) => {
+        if (!disposed) setError((e as Error).message)
+      })
+      .finally(() => {
+        if (!disposed) setLoading(false)
+      })
     return () => {
       disposed = true
     }
   }, [hydrate])
 
-  const onRunUpdate = useCallback((next: Run) => {
-    if (next.scenarioId !== selection.current || next.id !== currentRun.current) return
-    setCurrentRun(next)
-    setRuns((previous) => [next, ...previous.filter((r) => r.id !== next.id)])
-    if (next.error) setError(next.error)
-  }, [setCurrentRun])
+  const onRunUpdate = useCallback(
+    (next: Run) => {
+      if (next.scenarioId !== selection.current || next.id !== currentRun.current) return
+      setCurrentRun(next)
+      setRuns((previous) => [next, ...previous.filter((r) => r.id !== next.id)])
+      if (next.error) setError(next.error)
+    },
+    [setCurrentRun],
+  )
   const stream = useRunStream(isActive(run) ? run!.id : null, onRunUpdate, setError)
 
   async function perform(action: () => Promise<void>) {

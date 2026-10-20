@@ -30,7 +30,11 @@ public sealed class RunQueue : IRunScheduler
             return;
         }
 
-        if (tokens.TryRemove(id, out var rejected)) rejected.Dispose();
+        if (tokens.TryRemove(id, out var rejected))
+        {
+            rejected.Dispose();
+        }
+
         throw new InvalidOperationException("Очередь запусков заполнена.");
     }
     public CancellationToken Token(Guid id) => tokens[id].Token;

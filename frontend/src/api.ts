@@ -12,7 +12,8 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     })
   } catch {
     if (options?.signal?.aborted) throw options.signal.reason
-    if (timeout.aborted) throw new Error('Сервер не ответил вовремя. Обновите данные перед повтором действия.')
+    if (timeout.aborted)
+      throw new Error('Сервер не ответил вовремя. Обновите данные перед повтором действия.')
     throw new Error('Сервер недоступен. Проверьте подключение и повторите попытку.')
   }
   if (!response.ok) {

@@ -21,8 +21,15 @@ public sealed class ApiExceptionHandler(ILogger<ApiExceptionHandler> logger) : I
             NpgsqlException => (503, "PostgreSQL недоступен. Проверьте подключение к базе данных."),
             _ => (500, "Внутренняя ошибка. Обратитесь к серверному журналу по traceId.")
         };
-        if (status >= 500) logger.LogError(exception, "API error {StatusCode}, trace {TraceId}", status, context.TraceIdentifier);
-        else logger.LogWarning("API request rejected {StatusCode}, {ExceptionType}, trace {TraceId}", status, exception.GetType().Name, context.TraceIdentifier);
+        if (status >= 500)
+        {
+            logger.LogError(exception, "API error {StatusCode}, trace {TraceId}", status, context.TraceIdentifier);
+        }
+        else
+        {
+            logger.LogWarning("API request rejected {StatusCode}, {ExceptionType}, trace {TraceId}", status, exception.GetType().Name, context.TraceIdentifier);
+        }
+
         await Results.Problem(statusCode: status, title: "Не удалось выполнить действие", detail: detail, extensions: new Dictionary<string, object?> { ["traceId"] = context.TraceIdentifier }).ExecuteAsync(context);
         return true;
     }
